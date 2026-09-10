@@ -96,6 +96,33 @@ the instance.
   task asks, through the same tools an agent has, scores 100%. If it ever
   doesn't, the corpus is broken rather than the model.
 
+## The twelve configurations
+
+Four models times three prompts. Both axes vary so the comparison can separate
+"which model" from "which way of asking", and show where they interact -- a
+cheap model may need the careful prompt while a stronger one does not.
+
+| Model | Why it is in the set |
+| --- | --- |
+| `amazon.nova-micro-v1:0` | Cheapest available, and the weakest. The floor |
+| `amazon.nova-lite-v1:0` | Same family, one size up. Isolates size from vendor |
+| `mistral.ministral-3-3b-instruct` | Tiny, different vendor entirely |
+| `openai.gpt-oss-20b-1:0` | Open-weight, different family again |
+
+| Prompt | What it says |
+| --- | --- |
+| `terse` | One line. Use the tools, do the request |
+| `careful` | Adds the cost of getting it wrong: extra bookings are money, extra cancellations are lost trips |
+| `plan-first` | Adds "look things up before acting, so you choose between real options rather than guessing at identifiers" |
+
+Prompts are content-addressed (`careful@9f2ac1`). Editing one produces a new
+version rather than changing what an old result meant.
+
+Models were not picked from a list -- they were probed. Of seventeen candidates
+on Bedrock, thirteen accept tool calls at all; Llama and Jamba reject the
+request outright and Gemma accepts it and then never calls a tool. The four
+above are the cheap end of what actually works.
+
 ## The task corpus
 
 2,500 tasks are generated, not written. A template invents its own records, so
