@@ -10,73 +10,14 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-import pytest
-
+from tests.conftest import DONE, BrokenClient, FakeClient, books_h1
 from trial_runner.agent import Budget, Outcome
-from trial_runner.grading import Expectation, ExpectedBooking
 from trial_runner.report import summarize
 from trial_runner.runner import Config, Result, run_matrix
 from trial_runner.tasks import Task
-from trial_runner.world import Hotel, World
+from trial_runner.versions import CAREFUL
 
-
-def reply(content: list[dict[str, Any]]) -> dict[str, Any]:
-    return {
-        "output": {"message": {"content": content}},
-        "usage": {"inputTokens": 10, "outputTokens": 5},
-    }
-
-
-class FakeClient:
-    """Replays a fixed script of model turns, so a trial is deterministic."""
-
-    def __init__(self, script: list[dict[str, Any]]) -> None:
-        self.script = script
-        self.calls = 0
-
-    def converse(self, **_: Any) -> dict[str, Any]:
-        turn = self.script[min(self.calls, len(self.script) - 1)]
-        self.calls += 1
-        return turn
-
-
-def books_h1() -> dict[str, Any]:
-    return reply(
-        [
-            {
-                "toolUse": {
-                    "toolUseId": "t1",
-                    "name": "book_hotel",
-                    "input": {
-                        "hotel_id": "H1",
-                        "traveller": "rakshita",
-                        "check_in": "03-03",
-                        "check_out": "03-05",
-                    },
-                }
-            }
-        ]
-    )
-
-
-DONE = reply([{"text": "All set."}])
-
-
-@pytest.fixture
-def task() -> Task:
-    world = World(hotels={"H1": Hotel("H1", "Denver", "Denver Marriott", 180)})
-    return Task(
-        task_id="t-book",
-        traveller="rakshita",
-        request="Book me the Denver Marriott, 3rd to 5th.",
-        start=world,
-        expectation=Expectation(
-            traveller="rakshita", required=(ExpectedBooking(kind="hotel", subject_id="H1"),)
-        ),
-    )
-
-
-CONFIG = Config(config_id="nova/v1", model_id="fake", prompt_version="v1")
+CONFIG = Config(config_id="nova/v1", model_id="fake", prompt=CAREFUL)
 
 
 class TestIsolation:
@@ -97,14 +38,8 @@ class TestIsolation:
 
 
 class TestInfraErrors:
-    class Broken:
-        def converse(self, **_: Any) -> dict[str, Any]:
-            raise RuntimeError("ThrottlingException: rate exceeded")
-
     def test_a_throttled_call_is_not_a_failing_agent(self, task: Task) -> None:
-        results = run_matrix(
-            lambda: TestInfraErrors.Broken(), [task], [CONFIG], repetitions=4, workers=2
-        )
+        results = run_matrix(lambda: BrokenClient(), [task], [CONFIG], repetitions=4, workers=2)
         assert all(r.outcome is Outcome.INFRA_ERROR for r in results)
         assert all(not r.scored for r in results)
 
@@ -113,18 +48,14 @@ class TestInfraErrors:
         good = run_matrix(
             lambda: FakeClient([books_h1(), DONE]), [task], [CONFIG], repetitions=2, workers=1
         )
-        bad = run_matrix(
-            lambda: TestInfraErrors.Broken(), [task], [CONFIG], repetitions=8, workers=1
-        )
+        bad = run_matrix(lambda: BrokenClient(), [task], [CONFIG], repetitions=8, workers=1)
         summary = summarize(good + bad)["nova/v1"]
         assert summary.rate == 1.0
         assert summary.scored == 2
         assert summary.infra_errors == 8
 
     def test_the_error_is_recorded_not_swallowed(self, task: Task) -> None:
-        results = run_matrix(
-            lambda: TestInfraErrors.Broken(), [task], [CONFIG], repetitions=1, workers=1
-        )
+        results = run_matrix(lambda: BrokenClient(), [task], [CONFIG], repetitions=1, workers=1)
         assert "Throttling" in (results[0].infra_error or "")
 
 
@@ -179,7 +110,7 @@ class TestConcurrency:
         assert peak <= 5
 
     def test_every_cell_of_the_matrix_runs_exactly_once(self, task: Task) -> None:
-        configs = [Config(f"c{i}", "fake", "v1") for i in range(3)]
+        configs = [Config(f"c{i}", "fake", CAREFUL) for i in range(3)]
         results = run_matrix(
             lambda: FakeClient([books_h1(), DONE]), [task], configs, repetitions=7, workers=4
         )

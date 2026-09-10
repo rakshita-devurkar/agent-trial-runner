@@ -29,15 +29,20 @@ from typing import Any
 from trial_runner.agent import Budget, InfraError, Outcome, Trial, run_trial
 from trial_runner.grading import grade
 from trial_runner.tasks import Task
+from trial_runner.versions import Prompt
 
 
 @dataclass(frozen=True)
 class Config:
-    """One version of the agent under test: a model and a prompt, pinned."""
+    """One version of the agent under test: a model and a prompt, both pinned."""
 
     config_id: str
     model_id: str
-    prompt_version: str
+    prompt: Prompt
+
+    @property
+    def prompt_version(self) -> str:
+        return self.prompt.version
 
 
 @dataclass
@@ -47,6 +52,9 @@ class Result:
     task_id: str
     config_id: str
     repetition: int
+    #: Recorded on every row: a rate with no provenance cannot be compared later.
+    model_id: str = ""
+    prompt_version: str = ""
     #: Defaults to the outcome that counts toward nothing. A cell whose outcome
     #: was never set means the runner itself broke, and a fail-safe default
     #: keeps that out of the rates rather than silently scoring it.
@@ -70,11 +78,19 @@ def run_one(
     make_client: Callable[[], Any], task: Task, config: Config, repetition: int, budget: Budget
 ) -> Result:
     """Run a single cell. Never raises: a broken platform is a recorded outcome."""
-    result = Result(task_id=task.task_id, config_id=config.config_id, repetition=repetition)
+    result = Result(
+        task_id=task.task_id,
+        config_id=config.config_id,
+        repetition=repetition,
+        model_id=config.model_id,
+        prompt_version=config.prompt_version,
+    )
     # This trial's own copy of the records. Nothing it does can reach another.
     world = task.start.copy()
     try:
-        trial = run_trial(make_client(), config.model_id, world, task.request, budget)
+        trial = run_trial(
+            make_client(), config.model_id, world, task.request, budget, config.prompt.text
+        )
     except InfraError as exc:
         result.outcome = Outcome.INFRA_ERROR
         result.infra_error = str(exc)
@@ -108,6 +124,7 @@ def run_matrix(
     workers: int = 8,
     budget: Budget | None = None,
     on_result: Callable[[Result], None] | None = None,
+    skip: set[tuple[str, str, int]] | None = None,
 ) -> list[Result]:
     """Run every task against every config, `repetitions` times each.
 
@@ -117,11 +134,17 @@ def run_matrix(
     largest number of requests that can ever be in flight.
     """
     budget = budget or Budget()
+    # Cells already recorded by an earlier attempt at this run. Resuming is not
+    # an optimisation at this size: redoing 200,000 finished trials because the
+    # last 100 failed would cost hours and money for nothing.
+    already = skip or set()
     cells: queue.Queue[tuple[Task, Config, int]] = queue.Queue()
+    configs = list(configs)
     for task in tasks:
         for config in configs:
             for repetition in range(repetitions):
-                cells.put((task, config, repetition))
+                if (task.task_id, config.config_id, repetition) not in already:
+                    cells.put((task, config, repetition))
 
     results: list[Result] = []
     lock = threading.Lock()

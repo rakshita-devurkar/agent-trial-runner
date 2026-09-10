@@ -26,14 +26,14 @@ from enum import StrEnum
 from typing import Any
 
 from trial_runner.tools import TOOLS
+
+#: Kept only as the default for callers that do not pin one. Real runs pass a
+#: versioned prompt, because a result whose wording cannot be identified later
+#: cannot be compared against anything.
+from trial_runner.versions import CAREFUL
 from trial_runner.world import World
 
-SYSTEM = (
-    "You are a travel booking assistant. Use the tools to carry out the traveller's "
-    "request against their account. Do only what was asked: extra bookings cost the "
-    "traveller money. When the request is complete, reply with a short confirmation "
-    "and no further tool calls."
-)
+SYSTEM = CAREFUL.text
 
 
 class Outcome(StrEnum):
@@ -121,7 +121,14 @@ def tool_config() -> dict[str, Any]:
     }
 
 
-def run_trial(client: Any, model_id: str, world: World, request: str, budget: Budget) -> Trial:
+def run_trial(
+    client: Any,
+    model_id: str,
+    world: World,
+    request: str,
+    budget: Budget,
+    system: str = SYSTEM,
+) -> Trial:
     """Run one trial to completion, a budget, or an infrastructure failure.
 
     `world` is mutated in place and is expected to be this trial's private copy.
@@ -139,7 +146,7 @@ def run_trial(client: Any, model_id: str, world: World, request: str, budget: Bu
             trial.stopped_because = "out of tokens"
             return trial
 
-        response = _converse(client, model_id, messages)
+        response = _converse(client, model_id, messages, system)
         usage = response.get("usage", {})
         trial.input_tokens += int(usage.get("inputTokens", 0))
         trial.output_tokens += int(usage.get("outputTokens", 0))
@@ -198,13 +205,15 @@ def _run_tool(world: World, call: dict[str, Any]) -> dict[str, Any]:
     return {"ok": result.ok, "data": result.data, "error": result.error}
 
 
-def _converse(client: Any, model_id: str, messages: list[dict[str, Any]]) -> dict[str, Any]:
+def _converse(
+    client: Any, model_id: str, messages: list[dict[str, Any]], system: str
+) -> dict[str, Any]:
     """One model call, with every failure mode named as ours rather than the agent's."""
     try:
         response: dict[str, Any] = client.converse(
             modelId=model_id,
             messages=messages,
-            system=[{"text": SYSTEM}],
+            system=[{"text": system}],
             toolConfig=tool_config(),
             inferenceConfig={"maxTokens": 1024, "temperature": 1.0},
         )
