@@ -68,10 +68,8 @@ Repeat 300,000 times, 48 at once.
   │          ▼                                                  │
   │   ┌────────────────────────────┐                            │
   │   │ 48 workers                 │                            │
-  │   │   copy the records         │                            │
-  │   │   load the pinned prompt   │                            │
-  │   │   run the agent loop  ─────┼───┐  ≤25 requests/sec      │
-  │   │   grade against the records│   │  (self-adjusting)      │
+  │   │   each running one trial ──┼───┐  ≤25 requests/sec      │
+  │   │   at a time, as above      │   │  (self-adjusting)      │
   │   └────────────────────────────┘   │                        │
   └────────────────┬───────────────────┼────────────────────────┘
                    │                   │
@@ -88,29 +86,21 @@ Repeat 300,000 times, 48 at once.
   count             read          under test
 ```
 
-Bedrock is a separate service, not something running on the instance. The EC2
-box calls it over the network with exactly the code that runs on a laptop.
+Bedrock is a separate service, not something running on the instance -- the EC2
+box calls it over the network with exactly the code that runs on a laptop. It is
+also the only part that costs money; the instance, the table and the bucket all
+sit inside the free tier at this volume.
+
+Notably absent: Lambda and SQS. Every trial is waiting on Bedrock, and Bedrock's
+rate limit belongs to the account rather than the machine, so more machines
+cannot go faster. A single process coordinating its own rate is the better
+design; split across Lambdas, each one would have to find that ceiling
+separately by being refused.
 
 Nobody logs in to start the run. The launcher hands AWS a startup script, and
 the machine clones, installs, runs and stops itself. Progress is read from
 DynamoDB rather than from the instance, which is also why a machine that dies
 mid-run is replaceable: launch another with the same run name.
-
-## What runs where
-
-| Piece | Why |
-|---|---|
-| **Bedrock** | The models under test. The only thing that costs money |
-| **EC2** (`t4g.small`) | Runs the matrix. Stops itself when finished |
-| **DynamoDB** | One row per trial. Written as they happen, so a crash loses nothing |
-| **S3** | Traces, for reading a failure back instead of reproducing it |
-| **IAM role** | The instance's permissions. No credentials on the box |
-
-Notably **not** used: Lambda and SQS. Every trial is waiting on Bedrock, and
-Bedrock's rate limit belongs to the account rather than the machine — so more
-machines cannot go faster, and a single process coordinating its own rate is
-the better design. Splitting across Lambdas would mean discovering that ceiling
-independently in each one.
 
 ## Running it
 
@@ -157,9 +147,9 @@ number gets believed.
 
 ## The twelve configurations
 
-Four models times three prompts. Both axes vary so the comparison can separate
-"which model" from "which way of asking", and show where they interact -- a
-cheap model may need the careful prompt while a stronger one does not.
+Four models times three prompts, so the comparison can separate "which model"
+from "which way of asking" -- and catch where they interact, since a cheap model
+may need the careful prompt while a stronger one does not.
 
 | Model | Why it is in the set |
 | --- | --- |
@@ -174,13 +164,13 @@ cheap model may need the careful prompt while a stronger one does not.
 | `careful` | Adds the cost of getting it wrong: extra bookings are money, extra cancellations are lost trips |
 | `plan-first` | Adds "look things up before acting, so you choose between real options rather than guessing at identifiers" |
 
-Prompts are content-addressed (`careful@9f2ac1`). Editing one produces a new
+Prompts are content-addressed (`careful@9f2ac1`), so editing one produces a new
 version rather than changing what an old result meant.
 
-Models were not picked from a list -- they were probed. Of seventeen candidates
-on Bedrock, thirteen accept tool calls at all; Llama and Jamba reject the
-request outright and Gemma accepts it and then never calls a tool. The four
-above are the cheap end of what actually works.
+The models were probed, not picked off a list: of seventeen candidates on
+Bedrock only thirteen accept tool calls at all -- Llama and Jamba reject the
+request, Gemma accepts it and then never calls a tool. These four are the cheap
+end of what works.
 
 ## The task corpus
 
