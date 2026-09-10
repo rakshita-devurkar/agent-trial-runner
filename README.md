@@ -108,6 +108,18 @@ while keeping another, rebook something cheaper, and book a flight and hotel
 together. Across twenty cities, eight travellers and randomised prices, with
 prices sampled without replacement so "the cheapest" is never a tie.
 
+## Not done yet
+
+- **Trace replay.** Every trial's steps are recorded to S3, but there is no way
+  to re-run one from its trace. Reading a failure back still means reading JSON
+  rather than watching it happen, and reproducing one means paying the model
+  again.
+- **A release gate.** Nothing turns a set of rates into a ship/do-not-ship
+  decision.
+- **Statistical comparison.** Twelve configurations is sixty-six pairwise
+  comparisons, and some will differ by chance alone. Raw pass rates are not safe
+  to rank on.
+
 ## Development
 
 ```bash
