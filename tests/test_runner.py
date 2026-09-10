@@ -10,7 +10,7 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from tests.conftest import DONE, BrokenClient, FakeClient, books_h1
+from tests.conftest import DONE, BrokenClient, FakeClient, books_h1, reply
 from trial_runner.agent import Budget, Outcome
 from trial_runner.report import summarize
 from trial_runner.runner import Config, Result, run_matrix
@@ -139,3 +139,63 @@ class TestFlakiness:
         summary = summarize(results)["nova/v1"]
         assert summary.solid_tasks == ["t-book"]
         assert summary.flaky_tasks == []
+
+
+class TestMalformedToolNames:
+    """Found on a real run: gpt-oss emitted a tool name Bedrock then refused to
+    accept back, so the agent's malformed output became our crashed trial."""
+
+    def _calling(self, name: str) -> dict[str, Any]:
+        return reply(
+            [{"toolUse": {"toolUseId": "t1", "name": name, "input": {"traveller": "rakshita"}}}]
+        )
+
+    def test_a_rejected_name_does_not_kill_the_trial(self, task: Task) -> None:
+        from trial_runner.agent import Outcome
+
+        results = run_matrix(
+            lambda: FakeClient([self._calling("functions.book hotel!"), DONE]),
+            [task],
+            [CONFIG],
+            repetitions=1,
+            workers=1,
+        )
+        # A wrong answer, because it never booked anything -- not an infra error.
+        assert results[0].outcome is Outcome.FAIL
+
+    def test_the_agent_is_told_the_tool_does_not_exist(self, task: Task) -> None:
+        results = run_matrix(
+            lambda: FakeClient([self._calling("bad name!"), DONE]),
+            [task],
+            [CONFIG],
+            repetitions=1,
+            workers=1,
+        )
+        trace = results[0].trace
+        assert trace is not None
+        assert any("no such tool" in (s.error or "") for s in trace.steps)
+
+    def test_what_is_echoed_back_is_always_acceptable(self) -> None:
+        """The actual failure: the *next* request was rejected, not this one."""
+        import re
+
+        from trial_runner.agent import _sanitize
+
+        content = [{"toolUse": {"toolUseId": "t", "name": "functions.book hotel!", "input": {}}}]
+        name = _sanitize(content)[0]["toolUse"]["name"]
+        assert re.match(r"^[a-zA-Z0-9_-]+$", name)
+
+    def test_a_valid_name_is_left_alone(self) -> None:
+        from trial_runner.agent import _sanitize
+
+        content = [{"toolUse": {"toolUseId": "t", "name": "book_hotel", "input": {}}}]
+        assert _sanitize(content)[0]["toolUse"]["name"] == "book_hotel"
+
+    def test_text_parts_are_untouched(self) -> None:
+        from trial_runner.agent import _sanitize
+
+        content: list[dict[str, Any]] = [
+            {"text": "thinking..."},
+            {"toolUse": {"toolUseId": "t", "name": "a b", "input": {}}},
+        ]
+        assert _sanitize(content)[0] == {"text": "thinking..."}

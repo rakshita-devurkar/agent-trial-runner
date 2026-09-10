@@ -20,6 +20,7 @@ separated here and never counted together.
 from __future__ import annotations
 
 import json
+import re
 import time
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -162,7 +163,12 @@ def run_trial(
             trial.seconds = time.monotonic() - started
             return trial
 
-        messages.append({"role": "assistant", "content": content})
+        # A model can emit a tool name Bedrock will not accept back, and echoing
+        # it verbatim gets the *next* request rejected -- turning the agent's
+        # malformed output into our crash. Observed from gpt-oss. Sanitising
+        # here keeps it what it actually is: an agent calling a tool that does
+        # not exist, which it is then told and can recover from.
+        messages.append({"role": "assistant", "content": _sanitize(content)})
         results = []
         for call in calls:
             outcome = _run_tool(world, call)
@@ -189,6 +195,30 @@ def run_trial(
     trial.stopped_because = "out of steps"
     trial.seconds = time.monotonic() - started
     return trial
+
+
+#: What Bedrock accepts as a tool name. A model is not obliged to respect it.
+_TOOL_NAME = re.compile(r"^[a-zA-Z0-9_-]+$")
+
+
+def _safe_name(name: str) -> str:
+    """A name Bedrock will accept, that still cannot match a real tool."""
+    if _TOOL_NAME.match(name):
+        return name
+    cleaned = re.sub(r"[^a-zA-Z0-9_-]", "_", name)[:60]
+    return cleaned or "unnamed_tool"
+
+
+def _sanitize(content: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Rewrite any tool name the API would reject, leaving everything else."""
+    fixed: list[dict[str, Any]] = []
+    for part in content:
+        use = part.get("toolUse")
+        if use is None or _TOOL_NAME.match(use.get("name", "")):
+            fixed.append(part)
+            continue
+        fixed.append({**part, "toolUse": {**use, "name": _safe_name(use["name"])}})
+    return fixed
 
 
 def _run_tool(world: World, call: dict[str, Any]) -> dict[str, Any]:
