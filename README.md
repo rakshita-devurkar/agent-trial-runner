@@ -80,21 +80,26 @@ the instance.
 
 ## What the platform guarantees
 
-- **Every trial starts from its own copy of the records.** One trial's booking
-  can never become the next one's starting state.
+Each of these is a way eval results go wrong quietly, which is the only way that
+matters -- a run that crashes gets fixed, a run that reports a plausible wrong
+number gets believed.
+
 - **A trial that could not run is not a trial that failed.** Throttling,
-  timeouts and crashes are recorded apart from wrong answers and excluded from
-  every rate — otherwise a pass rate is partly a measurement of our own outages.
-- **Budgets are enforced per trial.** Steps, tokens and wall-clock. An agent
-  that loops forever is a daily event at this volume, and running out is its own
-  outcome rather than a silent failure.
-- **Every result records what produced it.** Model, prompt version, corpus seed,
-  grader version. A rate with no provenance cannot be compared with anything.
-- **Resuming cannot double-count.** A cell is written under a conditional put,
-  so re-attempting one is refused by the database rather than counted twice.
+  timeouts and crashes are recorded apart from wrong answers and kept out of
+  every rate. Counted together, a pass rate is partly a measurement of our own
+  outages, and it flatters whichever configuration happened to run while the
+  service was healthy.
+- **Resuming cannot double-count.** Each cell is written under a conditional
+  put, so a re-attempted trial is refused by the database rather than counted
+  twice. Without it a resumed run quietly stops being a rate.
 - **The corpus is provably solvable.** An oracle that does exactly what each
-  task asks, through the same tools an agent has, scores 100%. If it ever
-  doesn't, the corpus is broken rather than the model.
+  task asks, through the same tools an agent has, scores 100%. A generated task
+  with an impossible expectation would fail every correct agent forever and look
+  like a model weakness.
+- **Every result records what produced it,** and every trial runs isolated and
+  capped. Model, prompt version, corpus seed and grader version travel with each
+  row; each trial gets its own copy of the records and its own budget of steps,
+  tokens and seconds.
 
 ## The twelve configurations
 
