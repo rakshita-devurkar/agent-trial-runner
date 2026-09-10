@@ -42,6 +42,60 @@ what the task required. Nothing reads the agent's own account of what it did.
 
 Repeat 300,000 times, 48 at once.
 
+## Architecture
+
+```
+  YOUR LAPTOP
+  ┌────────────────────────────────────────────┐
+  │  launch_ec2.py march-01                    │
+  │  trial-runner --aws report march-01        │──── watch it, from anywhere
+  └───────────────────┬────────────────────────┘
+                      │ launch, with a startup script
+                      ▼
+  ┌─────────────────────────────────────────────────────────────┐
+  │  EC2  t4g.small                          IAM role attached  │
+  │                                          (no keys on disk)  │
+  │  boot → git clone → uv sync → run → shut itself down        │
+  │                                                             │
+  │   ┌──────────────┐   generate 2,500 tasks                   │
+  │   │  the matrix  │   × 12 configs × 10 reps                 │
+  │   │  300,000     │   minus what DynamoDB says is done       │
+  │   └──────┬───────┘                                          │
+  │          ▼                                                  │
+  │   ┌──────────────┐                                          │
+  │   │    queue     │                                          │
+  │   └──────┬───────┘                                          │
+  │          ▼                                                  │
+  │   ┌────────────────────────────┐                            │
+  │   │ 48 workers                 │                            │
+  │   │   copy the records         │                            │
+  │   │   load the pinned prompt   │                            │
+  │   │   run the agent loop  ─────┼───┐  ≤25 requests/sec      │
+  │   │   grade against the records│   │  (self-adjusting)      │
+  │   └────────────────────────────┘   │                        │
+  └────────────────┬───────────────────┼────────────────────────┘
+                   │                   │
+      ┌────────────┴─────┐             ▼
+      ▼                  ▼      ┌──────────────┐
+ ┌──────────┐      ┌──────────┐ │   BEDROCK    │
+ │ DYNAMODB │      │    S3    │ │              │
+ │          │      │          │ │ nova-micro   │
+ │ 1 row    │      │ traces,  │ │ nova-lite    │
+ │ per      │      │ failures │ │ ministral-3b │
+ │ trial    │      │ only     │ │ gpt-oss-20b  │
+ └──────────┘      └──────────┘ └──────────────┘
+  what you          what you      the models
+  count             read          under test
+```
+
+Bedrock is a separate service, not something running on the instance. The EC2
+box calls it over the network with exactly the code that runs on a laptop.
+
+Nobody logs in to start the run. The launcher hands AWS a startup script, and
+the machine clones, installs, runs and stops itself. Progress is read from
+DynamoDB rather than from the instance, which is also why a machine that dies
+mid-run is replaceable: launch another with the same run name.
+
 ## What runs where
 
 | Piece | Why |
