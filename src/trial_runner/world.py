@@ -19,6 +19,17 @@ from dataclasses import dataclass, field, replace
 from enum import StrEnum
 
 
+def same_traveller(one: str | None, two: str | None) -> bool:
+    """Whether two spellings name the same person.
+
+    An agent told "I'm lena" that books for "Lena" has done nothing wrong, and
+    an exact match failed it. On the first real run that was 28 of 33 failures
+    -- the results were measuring the grader's case sensitivity rather than the
+    agent, and would have read as a model weakness.
+    """
+    return (one or "").strip().casefold() == (two or "").strip().casefold()
+
+
 class BookingStatus(StrEnum):
     ACTIVE = "active"
     CANCELLED = "cancelled"
@@ -82,5 +93,6 @@ class World:
         return [
             booking
             for booking in self.bookings.values()
-            if booking.traveller == traveller and booking.status is BookingStatus.ACTIVE
+            if same_traveller(booking.traveller, traveller)
+            and booking.status is BookingStatus.ACTIVE
         ]

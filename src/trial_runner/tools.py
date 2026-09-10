@@ -14,7 +14,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from trial_runner.world import Booking, BookingStatus, World
+from trial_runner.world import Booking, BookingStatus, World, same_traveller
 
 
 @dataclass(frozen=True)
@@ -102,7 +102,7 @@ def list_bookings(world: World, *, traveller: str) -> ToolResult:
                 "check_out": b.check_out,
             }
             for b in sorted(world.bookings.values(), key=lambda b: b.booking_id)
-            if b.traveller == traveller
+            if same_traveller(b.traveller, traveller)
         ],
     )
 

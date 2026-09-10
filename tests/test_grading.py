@@ -102,3 +102,55 @@ class TestIsolation:
         mine = world.copy()
         book_hotel(mine, hotel_id="H1", traveller="rakshita", check_in="03-03", check_out="03-05")
         assert mine.bookings and not world.bookings
+
+
+class TestTravellerNames:
+    """Found by reading a trace from the first real run: an agent told "I'm
+    lena" booked for "Lena", and an exact match failed it. That was 28 of 33
+    failures -- the run was measuring the grader, not the agent."""
+
+    def test_a_capitalised_name_is_the_same_traveller(self, world: World) -> None:
+        book_hotel(world, hotel_id="H1", traveller="Lena", check_in="03-03", check_out="03-05")
+        assert grade(
+            world,
+            Expectation(
+                traveller="lena", required=(ExpectedBooking(kind="hotel", subject_id="H1"),)
+            ),
+        ).passed
+
+    def test_surrounding_whitespace_is_the_same_traveller(self, world: World) -> None:
+        book_hotel(world, hotel_id="H1", traveller=" lena ", check_in="03-03", check_out="03-05")
+        assert grade(
+            world,
+            Expectation(
+                traveller="lena", required=(ExpectedBooking(kind="hotel", subject_id="H1"),)
+            ),
+        ).passed
+
+    def test_a_different_person_is_still_a_different_person(self, world: World) -> None:
+        """The fix must not make every traveller the same traveller."""
+        book_hotel(world, hotel_id="H1", traveller="arjun", check_in="03-03", check_out="03-05")
+        assert not grade(
+            world,
+            Expectation(
+                traveller="lena", required=(ExpectedBooking(kind="hotel", subject_id="H1"),)
+            ),
+        ).passed
+
+    def test_an_unwanted_booking_is_still_caught_across_spellings(self, world: World) -> None:
+        """Otherwise the fix opens a hole: book twice, spell it differently, pass."""
+        book_hotel(world, hotel_id="H1", traveller="lena", check_in="03-03", check_out="03-05")
+        book_hotel(world, hotel_id="H2", traveller="Lena", check_in="03-03", check_out="03-05")
+        assert not grade(
+            world,
+            Expectation(
+                traveller="lena", required=(ExpectedBooking(kind="hotel", subject_id="H1"),)
+            ),
+        ).passed
+
+    def test_listing_finds_bookings_made_under_another_spelling(self, world: World) -> None:
+        """An agent that cannot see a booking cannot cancel it."""
+        from trial_runner.tools import list_bookings
+
+        book_hotel(world, hotel_id="H1", traveller="Lena", check_in="03-03", check_out="03-05")
+        assert list_bookings(world, traveller="lena").data

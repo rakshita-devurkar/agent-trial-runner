@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from trial_runner.world import BookingStatus, World
+from trial_runner.world import BookingStatus, World, same_traveller
 
 
 @dataclass(frozen=True)
@@ -67,7 +67,9 @@ class Grade:
 def grade(final: World, expectation: Expectation) -> Grade:
     """Compare the records the agent left behind against what was asked."""
     reasons: list[str] = []
-    mine = [b for b in final.bookings.values() if b.traveller == expectation.traveller]
+    mine = [
+        b for b in final.bookings.values() if same_traveller(b.traveller, expectation.traveller)
+    ]
     unclaimed = list(mine)
 
     for wanted in expectation.required:
