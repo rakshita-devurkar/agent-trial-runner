@@ -43,7 +43,7 @@ def ensure_bucket(name: str, region: str) -> None:
         if region == "us-east-1"
         else {"CreateBucketConfiguration": {"LocationConstraint": region}}
     )
-    s3.create_bucket(Bucket=name, **kwargs)  # type: ignore[arg-type]
+    s3.create_bucket(Bucket=name, **kwargs)
     # Traces are internal artefacts; nothing here should ever be public.
     s3.put_public_access_block(
         Bucket=name,

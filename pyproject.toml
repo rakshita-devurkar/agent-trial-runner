@@ -7,6 +7,9 @@ requires-python = ">=3.11"
 # sign-in AWS recommends over long-lived root access keys.
 dependencies = ["boto3>=1.35.0", "botocore[crt]>=1.35.0"]
 
+[project.scripts]
+trial-runner = "trial_runner.cli:main"
+
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.11"]
 
@@ -24,7 +27,13 @@ line-length = 100
 
 [tool.mypy]
 strict = true
-files = ["src", "tests"]
+files = ["src", "tests", "infra"]
+
+# boto3 ships no type information. Untyped rather than ignored wholesale, so a
+# mistake in our own code around these calls is still caught.
+[[tool.mypy.overrides]]
+module = ["boto3.*", "botocore.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

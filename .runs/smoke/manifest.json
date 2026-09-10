@@ -1,0 +1,29 @@
+{
+ "corpus_seed": 42,
+ "corpus_size": 3,
+ "budget": {
+  "max_steps": 8,
+  "max_tokens": 20000,
+  "max_seconds": 45.0
+ },
+ "configs": [
+  {
+   "config_id": "micro/terse",
+   "model_id": "amazon.nova-micro-v1:0",
+   "prompt_name": "terse",
+   "prompt_version": "78bce6cb33a7"
+  },
+  {
+   "config_id": "micro/careful",
+   "model_id": "amazon.nova-micro-v1:0",
+   "prompt_name": "careful",
+   "prompt_version": "3e7d44d870b3"
+  },
+  {
+   "config_id": "micro/plan-first",
+   "model_id": "amazon.nova-micro-v1:0",
+   "prompt_name": "plan-first",
+   "prompt_version": "c75f631ecb35"
+  }
+ ]
+}
