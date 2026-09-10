@@ -14,7 +14,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
-from tripwire.world import Booking, BookingStatus, World
+from trial_runner.world import Booking, BookingStatus, World
 
 
 @dataclass(frozen=True)

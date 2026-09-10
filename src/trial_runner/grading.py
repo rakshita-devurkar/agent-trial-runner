@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from tripwire.world import BookingStatus, World
+from trial_runner.world import BookingStatus, World
 
 
 @dataclass(frozen=True)
@@ -29,7 +29,7 @@ class ExpectedBooking:
     check_out: str | None = None
 
     def matches(self, booking: object) -> bool:
-        from tripwire.world import Booking
+        from trial_runner.world import Booking
 
         if not isinstance(booking, Booking):  # pragma: no cover - defensive
             return False

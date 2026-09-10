@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from tripwire.grading import Expectation, ExpectedBooking, grade
-from tripwire.tools import book_hotel, cancel_booking
-from tripwire.world import Booking, Hotel, World
+from trial_runner.grading import Expectation, ExpectedBooking, grade
+from trial_runner.tools import book_hotel, cancel_booking
+from trial_runner.world import Booking, Hotel, World
 
 
 @pytest.fixture

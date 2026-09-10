@@ -1,5 +1,5 @@
 [project]
-name = "tripwire"
+name = "agent-trial-runner"
 version = "0.1.0"
 description = "An evaluation platform for AI travel agents."
 requires-python = ">=3.11"
@@ -13,6 +13,11 @@ dev = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.11"]
 [build-system]
 requires = ["uv_build>=0.9.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# The distribution is `agent-trial-runner`; the import stays `trial_runner`,
+# because `from agent_trial_runner.world import World` helps nobody.
+module-name = "trial_runner"
 
 [tool.ruff]
 line-length = 100

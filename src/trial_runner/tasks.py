@@ -12,8 +12,8 @@ import hashlib
 import json
 from dataclasses import dataclass
 
-from tripwire.grading import Expectation
-from tripwire.world import World
+from trial_runner.grading import Expectation
+from trial_runner.world import World
 
 
 @dataclass(frozen=True)

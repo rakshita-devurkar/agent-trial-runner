@@ -25,8 +25,8 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
-from tripwire.tools import TOOLS
-from tripwire.world import World
+from trial_runner.tools import TOOLS
+from trial_runner.world import World
 
 SYSTEM = (
     "You are a travel booking assistant. Use the tools to carry out the traveller's "
