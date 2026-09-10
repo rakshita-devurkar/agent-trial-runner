@@ -70,6 +70,7 @@ class AwsStore:
             # DynamoDB stores exact decimals, not floats.
             "seconds": Decimal(str(round(result.seconds, 3))),
             "steps": result.steps,
+            "finished_at": Decimal(str(round(result.finished_at, 3))),
         }
         if result.infra_error:
             item["infra_error"] = result.infra_error[:900]
@@ -135,6 +136,7 @@ class AwsStore:
                         output_tokens=int(row.get("output_tokens", 0)),
                         seconds=float(row.get("seconds", 0)),
                         steps=int(row.get("steps", 0)),
+                        finished_at=float(row.get("finished_at", 0)),
                     )
                 )
             token = page.get("LastEvaluatedKey")

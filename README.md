@@ -155,6 +155,13 @@ written down, and an oracle proves the whole corpus is solvable.
 
 **[The configurations and the corpus in full](docs/corpus.md)**
 
+## Results
+
+- **[5,040-trial dry run](results/2026-09-10-dry-run.md)** — the platform at a
+  hundredth of scale, and a real finding: the prompt matters about as much as
+  the model, but only for weak ones. The terse prompt costs `gpt-oss-20b`
+  nothing and costs `ministral-3b` forty-seven points.
+
 ## Not done yet
 
 - **Trace replay.** Every trial's steps are recorded to S3, but there is no way

@@ -143,6 +143,26 @@ INPUT_PER_MILLION = 0.035
 OUTPUT_PER_MILLION = 0.14
 
 
+def throughput(results: list[Result]) -> str:
+    """Sustained trials per second, measured rather than assumed.
+
+    Wall clock between the first and last trial to finish, which is what a run
+    actually costs in time -- not the sum of trial durations, which counts the
+    workers' waiting many times over.
+    """
+    times = sorted(r.finished_at for r in results if r.finished_at)
+    if len(times) < 2:
+        return "throughput: not recorded"
+    elapsed = times[-1] - times[0]
+    if elapsed <= 0:
+        return "throughput: not recorded"
+    rate = len(times) / elapsed
+    return (
+        f"{rate:.2f} trials/s over {elapsed / 60:.1f}m  |  "
+        f"300,000 would take {300_000 / rate / 3600:.1f}h"
+    )
+
+
 def _cost(input_tokens: int, output_tokens: int) -> str:
     dollars = (input_tokens * INPUT_PER_MILLION + output_tokens * OUTPUT_PER_MILLION) / 1_000_000
     return f"${dollars:.4f}"

@@ -57,6 +57,7 @@ class Store:
             "output_tokens": result.output_tokens,
             "seconds": round(result.seconds, 3),
             "steps": result.steps,
+            "finished_at": round(result.finished_at, 3),
         }
         with self._lock:
             self._handle.write(json.dumps(row) + "\n")
@@ -109,7 +110,8 @@ class Store:
                     input_tokens=row.get("input_tokens", 0),
                     output_tokens=row.get("output_tokens", 0),
                     seconds=row.get("seconds", 0.0),
-                    steps=row.get("steps", 0),
+                    steps=int(row.get("steps", 0)),
+                    finished_at=float(row.get("finished_at", 0)),
                 )
             )
         return rows

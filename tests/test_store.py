@@ -101,3 +101,36 @@ class TestTraces:
         store = Store(tmp_path, "run-7")
         store.record(result(outcome=Outcome.PASS, trace=Trial(stopped_because="agent finished")))
         assert not list(store.traces.iterdir())
+
+
+class TestThroughput:
+    """The dry run could not report its own sustained rate, which was the one
+    number it existed to produce, because results carried no timestamp."""
+
+    def test_a_recorded_time_survives_the_round_trip(self, tmp_path: Path) -> None:
+        store = Store(tmp_path, "run-8")
+        store.record(result(outcome=Outcome.PASS, finished_at=1_760_000_000.5))
+        assert Store(tmp_path, "run-8").results()[0].finished_at == 1_760_000_000.5
+
+    def test_throughput_is_measured_across_the_run(self) -> None:
+        from trial_runner.report import throughput
+
+        results = [
+            Result(
+                task_id="t",
+                config_id="c",
+                repetition=i,
+                outcome=Outcome.PASS,
+                finished_at=1_760_000_000 + i,
+            )
+            for i in range(60)
+        ]
+        # 60 trials spread over 59 seconds is about one a second.
+        assert "1.02 trials/s" in throughput(results)
+
+    def test_it_says_so_when_it_cannot_tell(self) -> None:
+        """Better than inventing a rate from results that predate the field."""
+        from trial_runner.report import throughput
+
+        results = [Result(task_id="t", config_id="c", repetition=0, outcome=Outcome.PASS)]
+        assert "not recorded" in throughput(results)

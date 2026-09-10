@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import queue
 import threading
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any
@@ -66,6 +67,10 @@ class Result:
     output_tokens: int = 0
     seconds: float = 0.0
     steps: int = 0
+    #: When this trial finished, as a unix timestamp. Without it the sustained
+    #: throughput of a run cannot be recovered afterwards -- which is exactly
+    #: what the first dry run failed to measure.
+    finished_at: float = 0.0
     trace: Trial | None = None
 
     @property
@@ -94,6 +99,7 @@ def run_one(
     except InfraError as exc:
         result.outcome = Outcome.INFRA_ERROR
         result.infra_error = str(exc)
+        result.finished_at = time.time()
         return result
 
     result.trace = trial
@@ -107,11 +113,13 @@ def run_one(
         # an answer, so calling it wrong would overstate what we know.
         result.outcome = Outcome.EXHAUSTED
         result.reasons = [trial.stopped_because]
+        result.finished_at = time.time()
         return result
 
     verdict = grade(world, task.expectation)
     result.outcome = Outcome.PASS if verdict.passed else Outcome.FAIL
     result.reasons = verdict.reasons
+    result.finished_at = time.time()
     return result
 
 

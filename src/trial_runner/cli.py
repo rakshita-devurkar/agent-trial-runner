@@ -16,7 +16,7 @@ from typing import Any
 
 from trial_runner.agent import Budget, Outcome
 from trial_runner.generate import generate
-from trial_runner.report import render, summarize
+from trial_runner.report import render, summarize, throughput
 from trial_runner.runner import Config, run_matrix
 from trial_runner.store import Store, manifest_for
 from trial_runner.throttle import Limiter, Throttling, wrap_client
@@ -134,7 +134,20 @@ def cmd_run(args: argparse.Namespace) -> int:
         skip=already,
     )
     store.close()
-    print(f"\n\ndone in {(time.monotonic() - started) / 60:.1f}m")
+    elapsed = time.monotonic() - started
+    done_now = seen["n"]
+    print(f"\n\ndone in {elapsed / 60:.1f}m")
+    if done_now:
+        print(
+            f"  {done_now / elapsed:.2f} trials/s sustained  |  "
+            f"limiter settled at {limiter.rate:.0f}/s  |  "
+            f"{stats.refusals} throttled, {stats.gave_up} abandoned, "
+            f"{stats.waited_seconds:.0f}s spent waiting"
+        )
+        remaining = 300_000
+        print(
+            f"  at this rate 300,000 trials would take {remaining / (done_now / elapsed) / 3600:.1f}h"
+        )
     print(render(summarize(store.results())))
     return 0
 
@@ -147,6 +160,7 @@ def cmd_report(args: argparse.Namespace) -> int:
         return 1
     summaries = summarize(results)
     print(render(summaries))
+    print(f"\n{throughput(results)}")
     for config_id in sorted(summaries):
         summary = summaries[config_id]
         flaky = summary.flaky_tasks
