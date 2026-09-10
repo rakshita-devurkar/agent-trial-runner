@@ -201,13 +201,14 @@ def _run_tool(world: World, call: dict[str, Any]) -> dict[str, Any]:
 def _converse(client: Any, model_id: str, messages: list[dict[str, Any]]) -> dict[str, Any]:
     """One model call, with every failure mode named as ours rather than the agent's."""
     try:
-        return client.converse(
+        response: dict[str, Any] = client.converse(
             modelId=model_id,
             messages=messages,
             system=[{"text": SYSTEM}],
             toolConfig=tool_config(),
             inferenceConfig={"maxTokens": 1024, "temperature": 1.0},
         )
+        return response
     except Exception as exc:
         # Anything the SDK raises -- throttling, a timeout, a malformed
         # response, a model that is not enabled -- is the platform failing, and

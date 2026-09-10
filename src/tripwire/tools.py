@@ -10,6 +10,7 @@ is a broken platform.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
@@ -118,7 +119,7 @@ def cancel_booking(world: World, *, booking_id: str) -> ToolResult:
 
 
 #: The agent's entire vocabulary. Anything not here, it cannot do.
-TOOLS = {
+TOOLS: dict[str, Callable[..., ToolResult]] = {
     "search_flights": search_flights,
     "book_flight": book_flight,
     "search_hotels": search_hotels,
